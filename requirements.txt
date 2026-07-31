@@ -1,0 +1,11 @@
+# Runtime and test dependencies for CI. The measurement layer is pure Python:
+# no numpy, no scipy, no sklearn. The bootstrap resampling and the noise floor
+# arithmetic are written out in the benchmark so the definitions are visible.
+pydantic>=2.7,<3
+pydantic-settings>=2.3,<3
+pytest>=8,<10
+
+# Optional real-model providers. Both are imported lazily and are not needed
+# for the offline test suite, the demo, or the eval gate.
+# anthropic>=0.40
+# openai>=1.40

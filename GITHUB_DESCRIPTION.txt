@@ -1,0 +1,1 @@
+A reproducible prompt-injection benchmark that measures which defenses actually work: each payload is replayed against every defense, the report separates whether the agent COMPLIED from whether the damage was CONTAINED, failure rates carry bootstrap confidence intervals over a measured noise floor, and the defenses that do not work get published.
