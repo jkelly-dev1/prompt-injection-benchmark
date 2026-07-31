@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+KEY_INFO.md
+*.local.md
+# The whole audit directory: run artifacts, at any depth. A pattern of
+# audit/*.jsonl misses audit/attacks/*.jsonl and commits 34 files from a gate
+# run. AuditLog creates the directory at runtime, so nothing needs to be
+# committed to hold the place. A "!audit/.gitkeep" negation does nothing here:
+# git does not descend into an excluded directory, so the exception can never
+# match. Verified by deleting audit/ and rerunning the demo.
+audit/

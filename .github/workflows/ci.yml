@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Cancel an in-flight run when the same branch is pushed again.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      # Pinned to current majors (verified against the CI-green sibling repos):
+      # checkout v7, setup-python v7.
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest -q
+
+      # The attack gate is the guardrail, and it protects the BENCHMARK rather
+      # than a product: it exits 1 when the corpus has stopped being able to
+      # tell defense configurations apart, or when every defense suddenly looks
+      # effective. A coverage matrix degrades silently, so a payload edit that
+      # quietly makes the suite unable to rank anything cannot merge.
+      - name: Attack gate
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python -m bench.attacks.gate
+
+      # The demo is the offline end to end path. Running it in CI keeps
+      # SAMPLE_RUN.md honest: if the demo breaks, the build breaks.
+      - name: Demo (offline mock)
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python scripts/run_demo.py
