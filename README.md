@@ -440,6 +440,10 @@ Sibling projects, which it is designed to sit beside:
 - [llm-eval-gate](https://github.com/jkelly-dev1/llm-eval-gate) measures the
   judges rather than trusting them, and its finding that three judges' errors
   were completely nested is why this repo reports pairwise failure correlation.
+- [ai-data-boundary-proxy](https://github.com/jkelly-dev1/ai-data-boundary-proxy) asks the same
+  question about a different control: it measures what a right-to-erasure
+  operation misses, and its real-model run shows a threshold that separated two
+  populations on a mock embedder separating nothing on a real one.
 - [citation-abstention-rag](https://github.com/jkelly-dev1/citation-abstention-rag)
 - [agentic-review-gate](https://github.com/jkelly-dev1/agentic-review-gate)
 - [temporal-multi-agent](https://github.com/jkelly-dev1/temporal-multi-agent)
