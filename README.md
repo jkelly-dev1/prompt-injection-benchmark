@@ -444,6 +444,10 @@ Sibling projects, which it is designed to sit beside:
   question about a different control: it measures what a right-to-erasure
   operation misses, and its real-model run shows a threshold that separated two
   populations on a mock embedder separating nothing on a real one.
+- [federated-retrieval-router](https://github.com/jkelly-dev1/federated-retrieval-router)
+  asks this repo's question about its own instrument: it runs the same queries
+  through real stores to measure how much of a retrieval result belonged to the
+  hand-rolled stand-ins rather than to retrieval.
 - [citation-abstention-rag](https://github.com/jkelly-dev1/citation-abstention-rag)
 - [agentic-review-gate](https://github.com/jkelly-dev1/agentic-review-gate)
 - [temporal-multi-agent](https://github.com/jkelly-dev1/temporal-multi-agent)
