@@ -448,6 +448,10 @@ Sibling projects, which it is designed to sit beside:
   asks this repo's question about its own instrument: it runs the same queries
   through real stores to measure how much of a retrieval result belonged to the
   hand-rolled stand-ins rather than to retrieval.
+- [hardened-mcp-server](https://github.com/jkelly-dev1/hardened-mcp-server)
+  is the complement of this repo's `Channel.MCP_TOOL_DESCRIPTION`: it measures
+  the tool-definition fields a description-only pin never covers, and finds
+  that most of them deceive the operator without moving the model at all.
 - [citation-abstention-rag](https://github.com/jkelly-dev1/citation-abstention-rag)
 - [agentic-review-gate](https://github.com/jkelly-dev1/agentic-review-gate)
 - [temporal-multi-agent](https://github.com/jkelly-dev1/temporal-multi-agent)
