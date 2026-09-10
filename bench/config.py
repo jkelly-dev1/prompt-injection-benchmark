@@ -53,12 +53,13 @@ class Settings(BaseSettings):
     max_output_tokens: int = 800
     # Retries per call, handed to the SDK client rather than reimplemented here.
     # Both SDKs default to 2, which is sized for an interactive call and not for
-    # this. A full sweep is 1,296 sequential calls at roughly 3.7 seconds each,
-    # so an overload that outlives its retries at minute 60 discards the whole
-    # run: nothing is written until the matrix completes, and there is no
-    # resume. Five is chosen against that arithmetic, not against a single
-    # call's odds. The SDKs back off exponentially and honor retry-after, so the
-    # cost of the higher ceiling is paid only by runs that were failing anyway.
+    # this. A full sweep is 2,340 sequential calls over one to two hours, so an
+    # overload that outlives its retries at minute 60 ends the run there; the
+    # checkpoint means the paid calls are kept, but the sweep still has to be
+    # noticed and resumed by hand. Five is chosen against that arithmetic, not
+    # against a single call's odds. The SDKs back off exponentially and honor
+    # retry-after, so the cost of the higher ceiling is paid only by runs that
+    # were failing anyway.
     provider_max_retries: int = 5
 
     def model_for(self, provider: str) -> str:

@@ -97,6 +97,14 @@ _INVISIBLE = dict.fromkeys(
 
 #: A base64-looking run long enough to be worth trying to decode. Short runs are
 #: skipped because ordinary words match the character class.
+#:
+#: The leading \b is deliberate and costs nothing measurable. It means a run
+#: whose FIRST character is + or / matches one character late and is not
+#: decoded, and that is fine: base64 output begins with + or / only when the
+#: first encoded byte is 0xF8-0xFF, which is never a UTF-8 lead byte, so no
+#: text directive can be encoded that way and no model could read such a blob
+#: as text either. The same expression is used by the mock agent in llm.py so
+#: that the defense and the agent agree on what a decodable run looks like.
 _B64 = re.compile(r"\b[A-Za-z0-9+/]{24,}={0,2}\b")
 
 #: Hosts the agent is permitted to reach. Everything else is refused by

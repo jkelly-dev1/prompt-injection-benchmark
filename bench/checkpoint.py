@@ -5,8 +5,8 @@ calls with a single point of failure at the end: if `run_matrix` accumulates
 attempts in memory and only the completed matrix is ever written, an
 interruption at ANY point discards every call already paid for. One
 `anthropic.APIConnectionError` from a transient DNS blip is enough. At full
-size that is 1,296 sequential calls and roughly 80 minutes of exposure with no
-way to resume.
+size that is 2,340 sequential calls and between one and two hours of exposure
+with no way to resume.
 
 Retries are the wrong layer to fix this at. They shorten the odds of a blip
 killing a run; they cannot bound the loss when an outage outlasts the backoff

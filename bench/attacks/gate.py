@@ -17,9 +17,9 @@ belongs in SAMPLE_RUN.md, not in a pass or fail signal for CI.
 The check that matters most is gate_require_a_failing_defense. A benchmark in
 which every measured defense reduces attack success is a benchmark that has
 started flattering its subject. Prompt injection is not solved; if this suite
-ever reports that all seven controls work, the corpus has been quietly tuned to
-the defenses rather than the other way round, and that is the moment the project
-stops being evidence. So "at least one defense must be measurably ineffective"
+ever reports that every control in the matrix works, the corpus has been quietly
+tuned to the defenses rather than the other way round, and that is the moment
+the project stops being evidence. So "at least one defense must be measurably ineffective"
 is a PASS condition, not a bug.
 """
 
@@ -51,8 +51,9 @@ def evaluate(settings: Settings | None = None) -> tuple[list[str], list[str]]:
     """(report lines, failure messages). Empty failures means the gate passes."""
     settings = settings or get_settings()
     # The gate never selects a real provider, whatever the environment says.
-    settings = settings.model_copy(update={"agent_provider": "mock"})
-
+    # Nothing here has to arrange that: run_matrix builds the MockProvider for
+    # every trial when it is given no provider_factory, and the gate never
+    # passes one. tests/test_gate.py proves it with the network removed.
     attempts = run_matrix(settings)
     reports = summarize(
         attempts,
@@ -117,7 +118,16 @@ def evaluate(settings: Settings | None = None) -> tuple[list[str], list[str]]:
             f"corpus can no longer tell configurations apart. First few: "
             f"{', '.join(dead[:5])}"
         )
-    if settings.gate_require_a_failing_defense:
+    if baseline is None:
+        # Without the empty configuration there is nothing to measure against,
+        # and `effects` is empty. That is its own failure, named as such: the
+        # all-shown check below would otherwise fire on an empty list and
+        # announce that every configuration beat a baseline that never ran.
+        failures.append(
+            "the configuration set carries no undefended baseline, so no effect "
+            "can be measured at all. STANDARD_CONFIGS must include frozenset()."
+        )
+    elif settings.gate_require_a_failing_defense:
         ineffective = [label for label, _reduction, shown, _floor in effects if not shown]
         if not ineffective:
             failures.append(
@@ -134,7 +144,9 @@ def main(argv: list[str] | None = None) -> int:
     lines, failures = evaluate(settings)
 
     # The gate writes its audit trail to a temporary log so a CI run never
-    # appends to the committed sample log.
+    # appends to the audit log the demo keeps under audit/, which is the
+    # record of real runs and is not something a regression check should
+    # grow by one line per build.
     with tempfile.TemporaryDirectory() as directory:
         audit = AuditLog(Path(directory) / "gate.audit.jsonl")
         audit.append(

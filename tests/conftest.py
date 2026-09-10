@@ -3,7 +3,7 @@
 The guard matters more than the fixtures. Every test in this repository is
 offline, and the way that stops being true is not a deliberate change: it is a
 developer with ANTHROPIC_API_KEY exported in their shell running pytest and not
-noticing that a sweep of 1,296 trials just went to a paid API. So the provider
+noticing that a sweep of 2,028 trials just went to a paid API. So the provider
 environment is cleared for every test regardless of what the ambient shell says,
 and a test that wants a credentialed provider constructs Settings explicitly.
 

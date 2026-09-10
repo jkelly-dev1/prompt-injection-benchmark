@@ -42,7 +42,7 @@ from typing import Protocol, runtime_checkable
 
 from bench.config import Settings, get_settings
 from bench.defenses import PROMPT_DEFENSE_CEILING, PROMPT_LEVEL
-from bench.models import Action, ActionKind
+from bench.models import REFUSED_WITHOUT_TEXT, Action, ActionKind
 from bench.prompts import ACTION_SCHEMA, SYSTEM_PROMPT, envelope
 
 
@@ -180,6 +180,10 @@ _DIRECTIVES: list[tuple[re.Pattern[str], ActionKind, int | None]] = [
      ActionKind.TOOL_CALL, 1),
 ]
 
+#: The same run shape unicode_normalization decodes (see defenses._B64 for why
+#: the leading \b excludes nothing a model could read): the mock and the
+#: defense must agree on what counts as a decodable run, or the encoded class
+#: would measure a disagreement between two regexes rather than a defense.
 _B64_RUN = re.compile(r"\b[A-Za-z0-9+/]{24,}={0,2}\b")
 
 
@@ -451,8 +455,13 @@ class AnthropicProvider:
         except TypeError:
             message = self._client.messages.create(**kwargs)
         # A refusal has no text block; reading content[0] first would raise.
+        # The marker goes into `why`, which parse_action carries into
+        # `Action.provoked_by`, so the report can count these turns apart
+        # from the non-compliances that carry text (Action.refused_without_text).
         if getattr(message, "stop_reason", None) == "refusal":
-            return json.dumps({"kind": "answer", "target": "", "why": "refused"})
+            return json.dumps(
+                {"kind": "answer", "target": "", "why": REFUSED_WITHOUT_TEXT}
+            )
         return "".join(
             block.text for block in message.content if getattr(block, "type", "") == "text"
         )

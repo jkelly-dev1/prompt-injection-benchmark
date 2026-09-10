@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -83,15 +84,42 @@ class AuditLog:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    def _last_hash(self) -> str:
+    def _lines(self) -> list[tuple[str, dict | None]]:
+        """Every non-blank line, paired with its record or None if unreadable.
+
+        Guarded per line, because one torn line must not take the file with
+        it. A process killed mid-write leaves half a JSON object at the tail,
+        and an unguarded json.loads there turns a single lost record into a
+        log that raises on every later append and every verification, which
+        is a log that can never be written to or trusted again. The torn
+        line is kept in the file and reported as None: readers skip it,
+        `verify_chain` returns False over it, and `append` chains from the
+        last record that is intact.
+        """
         if not self.path.exists():
-            return GENESIS_HASH
-        last = GENESIS_HASH
+            return []
+        lines: list[tuple[str, dict | None]] = []
         with self.path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 line = line.strip()
-                if line:
-                    last = json.loads(line)["record_hash"]
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    lines.append((line, None))
+                    continue
+                if not isinstance(record, dict) or "record_hash" not in record:
+                    lines.append((line, None))
+                    continue
+                lines.append((line, record))
+        return lines
+
+    def _last_hash(self) -> str:
+        last = GENESIS_HASH
+        for _line, record in self._lines():
+            if record is not None:
+                last = record["record_hash"]
         return last
 
     def append(self, kind: str, run_id: str, payload: dict) -> dict:
@@ -99,6 +127,12 @@ class AuditLog:
 
         The hash is computed after `prev_hash` is filled in, never before, so a
         record can never be written with a hash that omits its own link.
+
+        Flushed AND fsynced. The checkpoint is content to lose its tail on a
+        power loss because a lost trial is simply rerun; an audit record is
+        the thing that says a decision was made, and losing it after the
+        caller was told it was written is the failure this log exists to
+        rule out.
         """
         record = {
             "kind": kind,
@@ -108,20 +142,24 @@ class AuditLog:
             "prev_hash": self._last_hash(),
         }
         record["record_hash"] = compute_record_hash(record)
+        # A torn tail has no newline. Writing straight after it would glue
+        # this record onto the half-record before it and lose both, so the
+        # write starts on a fresh line whenever the file does not end on one.
+        separator = ""
+        if self.path.exists() and self.path.stat().st_size > 0:
+            with self.path.open("rb") as handle:
+                handle.seek(-1, os.SEEK_END)
+                if handle.read(1) != b"\n":
+                    separator = "\n"
         with self.path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(record) + "\n")
+            handle.write(separator + json.dumps(record) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
         return record
 
     def read_all(self) -> list[dict]:
-        if not self.path.exists():
-            return []
-        records: list[dict] = []
-        with self.path.open("r", encoding="utf-8") as handle:
-            for line in handle:
-                line = line.strip()
-                if line:
-                    records.append(json.loads(line))
-        return records
+        """Every readable record. An unreadable line is skipped, not raised."""
+        return [record for _line, record in self._lines() if record is not None]
 
     def verify_chain(self) -> bool:
         """True only if every record hashes correctly and links its predecessor.
@@ -130,9 +168,17 @@ class AuditLog:
         payload, and the hash check alone would miss a record that was moved,
         so a caller gets one answer that covers editing, reordering and
         excision together.
+
+        A line that cannot be read is a broken chain, so the answer is False.
+        It is an answer rather than an exception because the caller is a
+        report printing "chain intact yes/no", and a verifier that raises
+        instead of saying "no" is a verifier whose one job has been handed
+        back to whoever reads the traceback.
         """
         previous = GENESIS_HASH
-        for record in self.read_all():
+        for _line, record in self._lines():
+            if record is None:
+                return False
             if record.get("prev_hash") != previous:
                 return False
             if compute_record_hash(record) != record.get("record_hash"):

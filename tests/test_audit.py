@@ -201,3 +201,48 @@ def test_the_record_hash_is_stable_across_key_insertion_order(tmp_path):
     )
     assert list(payload_for_hash(written)) != sorted(payload_for_hash(written))
     assert compute_record_hash(written) == written["record_hash"]
+
+
+def test_a_torn_line_is_reported_not_raised_and_the_log_keeps_working(
+    tmp_path, monkeypatch
+):
+    """A process killed mid-write leaves half a record. The log survives it.
+
+    Three good records, then a torn tail with no newline. The verifier answers
+    False rather than raising, because a report prints "chain intact yes/no"
+    and a traceback is neither. The readers skip the torn line. And the next
+    append still works, chaining from the last intact record, so one lost
+    record does not turn into a file that can never be written to again.
+
+    The torn line is NOT repaired or removed: the chain over the file stays
+    broken, which is the truthful answer about a damaged log.
+
+    The append is also fsynced, asserted on the call the code makes rather
+    than on the file, because a buffered write looks identical from here.
+
+    Mutation checks: restore the unguarded json.loads and the first assertion
+    raises JSONDecodeError instead of returning; drop the fsync and the spy
+    records nothing.
+    """
+    log = AuditLog(tmp_path / "audit.jsonl")
+    _one, _two, third = _three_chained_records(log)
+    with log.path.open("a", encoding="utf-8") as handle:
+        handle.write('{"kind": "trial_scored", "run_id": "run-0000000')
+
+    assert log.verify_chain() is False
+    assert [r["record_hash"] for r in log.read_all()] == [
+        _one["record_hash"], _two["record_hash"], third["record_hash"]
+    ]
+
+    synced: list[int] = []
+    monkeypatch.setattr("bench.audit.os.fsync", lambda fd: synced.append(fd))
+    fourth = log.append("run_finished", "run-000000000002", {"exit_code": 0})
+    assert synced, "append must fsync the record it just reported as written"
+    assert fourth["prev_hash"] == third["record_hash"], (
+        "a new record chains from the last INTACT record"
+    )
+    assert len(log.read_all()) == 4
+    assert log.verify_chain() is False, "the torn line is still there; the chain is broken"
+    assert "run-0000000" in log.path.read_text(encoding="utf-8"), (
+        "the torn line is kept, not silently repaired"
+    )

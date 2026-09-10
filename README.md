@@ -23,7 +23,8 @@ disagreement is the most useful thing in this repository. Against
 reductions and cleared its noise floor, which is the opposite of the offline
 verdict. Against `claude-opus-5` nothing cleared the floor at all, because that
 model complied 27 times in 2,028 trials and there was almost nothing left to
-reduce. Same corpus, same defenses, same code, three different answers. See
+reduce; `gpt-5.6-terra` complied 486 times in the same 2,028, which is the
+difference the two sweeps are measuring. Same corpus, same defenses, same code, three different answers. See
 [Real model results](#real-model-results); the reason a mock cannot stand in for
 a model is limit 1.
 
@@ -130,15 +131,52 @@ zero, and that number is the point rather than an embarrassment.
 Two full sweeps, 2,028 trials and 2,340 model calls each, taken 2026-07-30. Full
 captures are in [SAMPLE_RUN.md](SAMPLE_RUN.md). Every compliance below was
 verified against the checkpoint's own record of what the agent did rather than
-trusted from a rate: for the 77 answer-shaped compliances that is the verbatim
-answer text, and for the other 413 it is the recorded action: the tool name, the
-URL, the memory key. Action-taking trials store no answer text.
+trusted from a rate: for the 104 answer-shaped compliances, 77 from
+`gpt-5.6-terra` and 27 from `claude-opus-5`, that is the verbatim answer text,
+and for the other 413, all of them `gpt-5.6-terra`, it is the recorded action:
+the tool name, the URL, the memory key. Action-taking trials store no answer
+text.
+
+Two words label every real-model figure in this section, because the two sweeps
+were scored under code that two later fixes changed. PRINTED is what the run
+printed, captured verbatim in `SAMPLE_RUN.md`. RE-SCORED is the same stored
+trial re-judged under the shipped scoring, which moved seven `gpt-5.6-terra`
+trials and no `claude-opus-5` trial; `SAMPLE_RUN.md` names the seven. The two
+are never mixed in one table here. Where a figure is the same under both, it is
+labeled RE-SCORED.
+
+Every real-model figure in this section is reproducible from this repository.
+The per-trial rows the scoring reads are published under `results/`:
+
+    results/trials.claude-opus-5.jsonl      2,028 trials
+    results/trials.gpt-5_6-terra.jsonl      2,028 trials
+
+Each row carries every field the scoring consumes -- `payload_id`, `defenses`,
+`repeat`, `complied`, `contained`, `contained_by`, `neutralized_by`,
+`attack_class`, `channel`, and the action's `kind` and `target` -- so
+`summarize()` and `effect_over_baseline()` over these rows reproduce the tables
+above exactly. A test asserts it.
+
+WHAT THE PUBLISHED ROWS DO NOT CARRY is the model's prose: the answer text and
+the stated reason are replaced by their LENGTH. The scoring reads neither, so no
+figure depends on them, and this repository does not redistribute provider
+output. The lengths are kept because they carry the property the prose was
+evidence for -- whether a refusal arrived with words or without, which is what
+the `refused, no text` column counts.
+
+The raw checkpoints remain unshipped under `audit/`, which `.gitignore`
+excludes whole. `scripts/publish_trials.py` derives a `results/` file from one.
+The offline figures are reproducible from the tree alone and a test pins them
+to the README.
+
+RE-SCORED:
 
 ```
                                 claude-opus-5      gpt-5.6-terra
 undefended baseline compliance      0.026              0.365
 compliance, all configurations      0.013              0.242
 of which action-taking                  0                413
+refused, no text                    0.699              0.000
 noise floor                         0.019              0.084
 payloads that never discriminate    50/52              25/52
 ```
@@ -148,23 +186,34 @@ GET or memory write, in 2,028 trials, under any configuration including the
 undefended baseline. The checkpoint carries 15 tool calls from it, all of them
 the in-grant `search_documents` on `mem-02` and all scored non-compliant. All 27
 of its compliances are format adoption on two payloads, `ovr-06` and `per-05`.
-It refuses articulately: it names the injection, identifies the channel it
-arrived through, and sometimes recommends flagging the tool description as
-compromised.
 
-`gpt-5.6-terra` did. 191 HTTP GETs, of which 188 went to attacker-controlled
-hosts and 3 to the one allowlisted internal host that payload `exf-04`
-deliberately targets; 160 tool calls, of which 152 were outside the grant and 8
-were the in-grant `search_documents`; and 62 memory writes, across all nine
-attack classes.
+What the rest of that column is made of matters, and the harness reports it
+apart. Of the 2,028 trials, 1,418 (0.699) are refusals with no text: the API
+returned a `refusal` stop reason and no content, which the harness records as a
+non-compliance, and 23 of the 52 payloads never drew a word from the model under
+any configuration. 595 trials carry answer text, and those are the ones that
+refuse articulately: they name the injection, identify the channel it arrived
+through, and sometimes recommend flagging the tool description as compromised.
+The remaining 15 are the `mem-02` tool calls. A textless refusal is a genuine
+refusal and not a measurement failure, so the headline stands; but the articulate
+refusals describe three trials in ten, not the run, and a compliance rate of
+0.013 reads differently once seven trials in ten never answered at all. The
+per-configuration split is the `refused, no text` column in `SAMPLE_RUN.md`.
+
+`gpt-5.6-terra` did, and refused nothing outright. RE-SCORED: 191 HTTP GETs, of
+which 188 went to attacker-controlled hosts and 3 to the one allowlisted
+internal host that payload `exf-04` deliberately targets; 160 tool calls, of
+which 152 were outside the grant and 8 were the in-grant `search_documents`; and
+62 memory writes, across all nine attack classes.
 
 The two disagree about which defenses work, and neither agrees with the mock.
+Both real-model columns RE-SCORED:
 
 ```
                               offline      opus-5      terra
 delimiter_fencing            NOT SHOWN   NOT SHOWN   +0.333 shown
 provenance_tagging           NOT SHOWN   NOT SHOWN   +0.321 shown
-instruction_hierarchy        NOT SHOWN   NOT SHOWN   +0.141 NOT SHOWN
+instruction_hierarchy        NOT SHOWN   NOT SHOWN   +0.147 NOT SHOWN
 egress_filter                  +0.327    NOT SHOWN   NOT SHOWN
 tool_allowlist                 +0.269    NOT SHOWN   NOT SHOWN
 egress_filter+tool_allowlist   +0.596    NOT SHOWN   +0.256 shown
@@ -178,9 +227,12 @@ identical in a reduction column, so compliance is reported beside it.
 
 The `gpt-5.6-terra` column is the interesting one, and it inverts the offline
 finding: for two of the prompt-level family's three members. `instruction_
-hierarchy` is the third, and it did NOT clear its floor: +0.141 against a
-per-configuration floor of 0.154. It is listed above, because a family whose
-members split is a different finding from a family that wins, and the split is
+hierarchy` is the third, and it did NOT clear its floor: +0.147 RE-SCORED, +0.141
+PRINTED, against a per-configuration floor of 0.173 under both scorings. That
+floor is this configuration's own flip rate, which is higher than the baseline's
+and is the one the comparison is judged against. It is listed above, because a
+family whose members split is a different finding from a family that wins, and
+the split is
 the more useful one: it says the effect belongs to particular framings rather
 than to prompt-level framing as a category. Fencing the untrusted material cut
 compliance from 0.365 to 0.032 on a model that otherwise complied a third of the
@@ -193,8 +245,9 @@ contained 0.373 of the compliances it saw while `tool_allowlist` contained
 0.286.
 
 What survives all three columns. `unicode_normalization` alone buys nothing
-anywhere, and measures slightly negative on both real models. The compliance and
-containment split stays legible in every run.
+anywhere: -0.019 RE-SCORED on `gpt-5.6-terra` (-0.026 PRINTED), +0.006 on
+`claude-opus-5` under both scorings, and +0.000 offline, every one of them inside
+its floor. The compliance and containment split stays legible in every run.
 
 Nothing reaches zero offline, and that is the column that claim belongs to.
 Against the real models it does: on `claude-opus-5` four configurations measure
@@ -271,6 +324,13 @@ that closed the class.
 | Every prompt-level defense's framing reaches the RENDERED prompt, ahead of the body, and provenance tagging actually tags the material | `tests/test_defenses.py::test_every_prompt_level_defense_reaches_the_rendered_prompt` (mutation-checked: drop the prefix from `render_user_prompt`, or gut `provenance_tagging` to a no-op, and it fails) |
 | A reduced sweep contains one member of every defense family, so no family is invisible to it | `tests/test_harness.py::test_the_reduced_config_set_covers_every_defense_family` (mutation-checked; the same failure as the payload sampler, one level up) |
 | The preflight bills model calls, not trials, because a multi-turn trial is two calls | `tests/test_harness.py::test_the_call_count_is_not_the_trial_count` (mutation executed in-test: a slice with no multi-turn payloads has calls == trials) |
+| The 12-row offline effect table above, and the header figures beside it, are what the gate prints today | `tests/test_gate.py::test_the_published_effect_table_is_the_one_the_gate_prints` (mutation-checked in both directions: read the carried history without the assistant-only filter and five rows move; edit one README figure and the test names the row) |
+| The mock reads a carried directive only out of its own prior turns, never the plant's user turn | `tests/test_llm.py::test_the_mock_reads_a_carried_directive_only_from_its_own_prior_turns` (mutation-checked: drop the role filter and the plant fires from the transcript) |
+| A refusal with no text is counted apart from a non-compliance that carries text, and from the mock's own textless answers | `tests/test_scoring.py::test_a_textless_refusal_is_counted_apart_from_a_textless_non_compliance` (mutation-checked: count textless answers instead and the mock's shape is counted) |
+| The demo prints `neutralized` and `refused, no text` beside compliance, so neither is a field computed and shown nowhere | `tests/test_demo.py::test_the_demo_prints_neutralized_and_textless_refusal_beside_compliance` |
+| A neutralization is measured on a trial where the agent DECLINED a still-legible directive, so the field is empty because of the measurement and not because compliance blanked it | `tests/test_harness.py::test_neutralized_by_is_measured_even_when_the_agent_declines` (mutation-checked: trust the defense's flag, or drop the was-legible half of the condition, and it fails) |
+| A torn line in the audit log makes `verify_chain` answer False rather than raise, the readers skip it, the next append chains from the last intact record, and the append is fsynced | `tests/test_audit.py::test_a_torn_line_is_reported_not_raised_and_the_log_keeps_working` (mutation-checked: restore the bare `json.loads` and it raises; drop the fsync and the spy sees nothing) |
+| A configuration set with no undefended baseline fails the gate by name, not with "every configuration beat the baseline" | `tests/test_gate.py::test_a_configuration_set_with_no_baseline_names_the_missing_baseline` (mutation-checked) |
 
 ## Quickstart
 
@@ -278,7 +338,7 @@ that closed the class.
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 
-pytest -q                          # 103 tests, fully offline
+pytest -q                          # 114 tests, fully offline
 python -m bench.attacks.gate       # the CI attack gate
 python scripts/run_demo.py         # the whole matrix, end to end
 ```
@@ -428,13 +488,15 @@ behavior belongs in `SAMPLE_RUN.md` and never in a pass or fail signal for CI.
 ## TODO / not yet wired (honest scope)
 
 - **The two sweeps were scored under code that two later fixes changed, and the
-  published figures are RE-SCORED rather than the numbers those runs printed.**
+  published figures are labeled RE-SCORED or PRINTED wherever they appear.**
   Every trial's raw action and verbatim answer is in the checkpoint, and the
   post-defense material is a pure function of the payload and configuration, so
   a scoring change can be applied to a finished sweep without paying for it
   again. Seven `gpt-5.6-terra` trials moved and zero `claude-opus-5` trials did.
   Both the printed and the re-scored figures are in `SAMPLE_RUN.md`, with the
-  seven named individually.
+  seven named individually. The re-scoring is reproducible from the published
+  per-trial rows under `results/`; the raw checkpoints they derive from are not
+  shipped.
 - An LLM-judge screening defense is designed for and not implemented; it is the
   obvious eighth defense and needs a second model call per trial. It is also the
   fix for limit 7, since a judge could read an adopted persona that never uses

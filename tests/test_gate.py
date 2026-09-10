@@ -23,12 +23,17 @@ being evidence.
 
 from __future__ import annotations
 
+import re
 import socket
+from pathlib import Path
 
 from bench.attacks import gate
 from bench.attacks.corpus import CORPUS
 from bench.attacks.gate import evaluate, main
 from bench.config import Settings
+from bench.harness import run_matrix
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _settings(**overrides) -> Settings:
@@ -121,8 +126,8 @@ def test_the_gate_runs_on_the_mock_even_when_a_real_provider_is_fully_configured
 def test_every_defense_beating_its_floor_fails_the_gate(monkeypatch):
     """The honesty control, simulated on the run it is meant to catch.
 
-    Prompt injection is not solved. If this suite ever reports that all seven
-    controls measurably work, the likeliest explanation by far is that the
+    Prompt injection is not solved. If this suite ever reports that every
+    control measurably works, the likeliest explanation by far is that the
     corpus has been tuned to the defenses, so "at least one measured defense is
     ineffective" is a pass condition. The flattering run is simulated by
     replacing `effect_over_baseline` with one that returns nothing but shown
@@ -231,3 +236,122 @@ def test_main_returns_zero_and_prints_a_readable_verdict(capsys):
     assert f"ATTACK GATE PASSED ({len(CORPUS)} payloads)" in output
     assert "audit_chain_intact                   yes" in output
     assert "ATTACK GATE FAILED" not in output
+
+
+def _published_effect_table() -> list[tuple[str, str, str, bool]]:
+    """The 12-row table in README.md, as (label, reduction, flip, shown)."""
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    header = "configuration                          reduction    flip   verdict"
+    assert readme.count(header) == 1, "the README carries exactly one effect table"
+    block = readme.split(header, 1)[1].split("```", 1)[0]
+    rows = []
+    for line in block.strip().splitlines():
+        label, reduction, flip, *verdict = line.split()
+        rows.append((label, reduction, flip, " ".join(verdict).startswith("shown")))
+    return rows
+
+
+def _printed_effect_table(lines: list[str]) -> list[tuple[str, str, str, bool]]:
+    """The same table out of the gate's own report lines."""
+    start = next(
+        index for index, line in enumerate(lines)
+        if line.strip().startswith("configuration") and "reduction" in line
+    )
+    rows = []
+    for line in lines[start + 1:]:
+        if not line.strip():
+            break
+        label, reduction, flip, *verdict = line.split()
+        rows.append((label, reduction, flip, " ".join(verdict).startswith("shown")))
+    return rows
+
+
+def _figure(lines: list[str], label: str) -> str:
+    """The value printed beside a header-section label, e.g. noise_floor."""
+    for line in lines:
+        cells = line.split()
+        if cells and cells[0] == label:
+            return " ".join(cells[1:])
+    raise AssertionError(f"the gate printed no {label!r} line")
+
+
+def test_the_published_effect_table_is_the_one_the_gate_prints():
+    """Every offline headline figure in README.md is what the gate prints today.
+
+    The README's "What it demonstrates" section is a capture, and a capture
+    that nothing compares against the code drifts the moment the code moves.
+    Both directions are pinned: every row the gate prints must appear in the
+    README with the same reduction, flip and verdict, in the same order, and
+    the README must carry no row the gate does not. The header figures, the
+    noise floor, the median interval width, the never-discriminate count and
+    the undefended baseline, are checked the same way.
+
+    Resamples are set to the committed default explicitly, because the median
+    interval width is the one figure here that depends on them, and the
+    capture was taken at that default. The default itself is asserted, so a
+    change to it fails here rather than silently moving the width.
+
+    Mutation check: read the carried history without the assistant-only
+    filter in `MockProvider.complete` and the five rows with a non-zero flip
+    rate move; the seven with flip 0.000 do not, which is what the mechanism
+    predicts, since the mutation changes only what survives across turns.
+    """
+    assert Settings.model_fields["bootstrap_resamples"].default == 2000
+    lines, failures = evaluate(_settings(bootstrap_resamples=2000))
+    assert failures == []
+
+    printed = _printed_effect_table(lines)
+    published = _published_effect_table()
+    assert len(printed) == len(published) == 12
+    for (plabel, preduction, pflip, pshown), (rlabel, rreduction, rflip, rshown) in zip(
+        printed, published
+    ):
+        # The README abbreviates long labels with an ellipsis and the gate
+        # truncates them; the README's stem must be a prefix of the gate's.
+        assert plabel.startswith(rlabel.rstrip(".")), (plabel, rlabel)
+        assert (preduction, pflip, pshown) == (rreduction, rflip, rshown), (
+            f"README row {rlabel!r} reads {rreduction} {rflip} "
+            f"{'shown' if rshown else 'NOT SHOWN'}; the gate prints {preduction} "
+            f"{pflip} {'shown' if pshown else 'NOT SHOWN'}"
+        )
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    floor = _figure(lines, "noise_floor")
+    width = _figure(lines, "median_interval_width")
+    dead = _figure(lines, "payloads_that_never_discriminate").split()[0]
+    baseline = _figure(lines, "attack_success")
+    for expected in (
+        f"noise floor             {floor}",
+        f"median 95% interval     {width}",
+        f"payloads that never discriminate   {dead}",
+        f"undefended baseline     attack_success {baseline}",
+    ):
+        assert re.search(re.escape(expected), readme), f"README lacks {expected!r}"
+
+
+def test_a_configuration_set_with_no_baseline_names_the_missing_baseline(monkeypatch):
+    """No baseline means no effect can be measured, and the message says that.
+
+    With the empty configuration gone, `effect_over_baseline` returns nothing,
+    and a check that reads "no configuration was NOT SHOWN" off an empty list
+    would announce that every configuration beat a baseline that never ran,
+    which is the opposite of what happened.
+
+    Mutation check: fold the baseline branch back into the all-shown check and
+    the failure text below reverts to "every measured configuration beat the
+    baseline", which the second assertion rejects.
+    """
+
+    def without_the_baseline(settings, **kwargs):
+        return [attempt for attempt in run_matrix(settings, **kwargs) if attempt.defenses]
+
+    monkeypatch.setattr(gate, "run_matrix", without_the_baseline)
+
+    lines, failures = evaluate(_settings())
+    assert any("no undefended baseline" in failure for failure in failures), failures
+    assert not any(
+        "every measured configuration beat the baseline" in failure for failure in failures
+    ), failures
+    assert "Undefended baseline" not in "\n".join(lines), (
+        "the simulated run really has no baseline block to print"
+    )
