@@ -3,15 +3,21 @@
 Each record is one JSON line. Before writing, `prev_hash` is set to the
 previous record's `record_hash`, and this record's hash is computed over its
 canonical payload, which INCLUDES `prev_hash`. Editing, reordering, or removing
-a past record therefore breaks every hash after it, and `verify_chain` reports
-the break instead of quietly accepting the file.
+a past record in place therefore breaks every hash after it, and `verify_chain`
+reports the break instead of silently accepting the file.
 
 Putting `prev_hash` inside the hashed payload is the whole difference between a
 chain and a list of independently hashed lines. Without it every surviving
 record would still verify against its own content while a deleted record went
-unnoticed, which is exactly the tampering an injection benchmark most needs to
-survive: a run whose embarrassing trials were excised before publication should
-not verify clean.
+unnoticed.
+
+What the chain does not stop. It is unkeyed: the hash is public and nothing
+signs it. Whoever can rewrite the file can excise a record and recompute every
+hash after it, and the result verifies clean; removing the LAST record needs
+no recomputation at all. So the chain detects an edit made without rehashing
+(an accident, a careless hand edit), not a deliberate rewrite. Holding the
+head hash and record count somewhere the writer cannot change is what would
+detect that, and nothing here does it.
 
 Timestamps are NOT frozen. They are excluded from the determinism claim rather
 than faked, because a faked timestamp in an audit trail is worse than an honest
@@ -20,7 +26,7 @@ run. Reproducibility comes from canonical JSON instead (sorted keys, tight
 separators), so two runs that recorded the same decisions produce the same
 hashes for everything except the timestamped fields.
 
-This module imports nothing from the rest of the benchmark on purpose. The log
+This module imports nothing from the rest of the benchmark. The log
 outlives the code that wrote it, and a verifier that needs the project's models
 to be importable is a verifier that stops working the moment those models
 change.

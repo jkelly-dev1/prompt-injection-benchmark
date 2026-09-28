@@ -37,6 +37,7 @@ from bench.defenses import (
     ALLOWED_TOOLS,
     Request,
     input_pattern_filter,
+    unicode_normalization,
 )
 from bench.models import ActionKind, AttackClass, Channel
 
@@ -61,7 +62,7 @@ def test_every_declared_channel_and_attack_class_is_actually_populated():
     """A declared-but-empty cell reads as "no attacks arrive this way".
 
     That is the most dangerous sentence a report of this kind could contain, so
-    the enums and the corpus are compared in both directions rather than trusting
+    the enums and the corpus are compared in both directions instead of trusting
     that whoever added a channel also wrote payloads for it.
     """
     assert set(channels()) == set(Channel)
@@ -82,7 +83,7 @@ def test_payload_ids_are_unique():
     """Two payloads sharing an ID would silently merge in every grouped result.
 
     Mutation check: duplicate any payload_id and the audit record, the per-class
-    rates and the matrix all keep working while quietly double-counting one
+    rates and the matrix all keep working while silently double-counting one
     sample, which is the kind of error a suite has to catch structurally.
     """
     ids = [payload.payload_id for payload in CORPUS]
@@ -108,10 +109,26 @@ def test_every_encoded_payload_carries_a_base64_run_that_really_decodes():
         assert len(blob) >= 24, (
             f"{payload.payload_id} has a run defenses._B64 would skip"
         )
-        padded = blob + "=" * (-len(blob) % 4)
-        plaintext = base64.b64decode(padded, validate=True).decode("utf-8")
-        assert plaintext.strip(), (
+        # The padding is found by trying each legal amount, not by repeating
+        # the formula unicode_normalization uses, so a wrong formula there
+        # cannot also be wrong here.
+        plaintext = None
+        for pad in ("", "=", "=="):
+            try:
+                plaintext = base64.b64decode(blob + pad, validate=True).decode("utf-8")
+                break
+            except ValueError:
+                continue
+        assert plaintext and plaintext.strip(), (
             f"{payload.payload_id} decodes to nothing an agent could act on"
+        )
+        # The defense must decode it the same way, which is the point of the
+        # encoded class: normalization makes the instruction legible.
+        normalized = unicode_normalization(
+            Request(task="summarize", untrusted=payload.injection)
+        ).untrusted
+        assert f"[decoded-from-base64: {plaintext}]" in normalized, (
+            f"{payload.payload_id}: unicode_normalization did not decode its run"
         )
 
 
@@ -174,7 +191,7 @@ def test_every_persona_hijack_wants_only_an_answer():
     A persona hijack calls no tool and opens no socket, so tool_allowlist and
     egress_filter score exactly zero against this class. If a hijack payload
     ever asked for a tool call, the class would start showing containment that
-    belongs to a different attack and the matrix would quietly overstate what
+    belongs to a different attack and the matrix would silently overstate what
     structural controls buy.
     """
     hijacks = by_attack_class(AttackClass.PERSONA_HIJACK)

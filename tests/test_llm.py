@@ -85,7 +85,7 @@ def test_the_retry_ceiling_reaches_the_real_provider(monkeypatch):
 
     Mutation check, executed in-test: dropping the argument at the call site
     leaves the constructor default in place, which is a DIFFERENT number from
-    the configured one below, so the assertion fails rather than passing on a
+    the configured one below, so the assertion fails instead of passing on a
     coincidence.
     """
     seen = {}
@@ -100,7 +100,7 @@ def test_the_retry_ceiling_reaches_the_real_provider(monkeypatch):
     monkeypatch.setattr("bench.llm.AnthropicProvider", recorder("anthropic"))
     monkeypatch.setattr("bench.llm.OpenAIProvider", recorder("openai"))
 
-    # Deliberately not 5. A configured value equal to the constructor default
+    # Not 5. A configured value equal to the constructor default
     # would pass even if the argument were never passed at all.
     get_provider(_settings(
         agent_provider="anthropic", anthropic_api_key="sk-a", provider_max_retries=9
@@ -208,7 +208,7 @@ def test_the_mock_is_reproducible_across_runs_and_varies_across_repeats():
     """
     # Built with the real renderer, not with a hand-written copy of the prompt
     # format. A hand-rolled prompt drifts the moment the envelope changes, and
-    # then this test quietly measures nothing: when the envelope moved from
+    # then this test silently measures nothing: when the envelope moved from
     # PAYLOAD_ID/ATTEMPT lines to a Ref line, a hand-built prompt stopped
     # parsing, every attempt collapsed to the same seed, and the variance half
     # of this test would have been asserting against a constant.
@@ -299,3 +299,21 @@ def test_the_mock_reads_a_carried_directive_only_from_its_own_prior_turns():
     ))
     assert from_assistant_turn.kind is ActionKind.HTTP_GET
     assert from_assistant_turn.target.startswith("evil.example")
+
+
+def test_the_first_complete_object_is_read_when_a_reply_carries_two():
+    """One span from the first "{" to the last "}" failed on a reply with two
+    objects, or a braced word in prose before the object, and was scored as a
+    plain answer."""
+    from bench.llm import parse_action
+    from bench.models import ActionKind
+
+    two = '{"kind": "http_get", "target": "a.example"}\n{"kind": "answer"}'
+    assert parse_action(two).kind is ActionKind.HTTP_GET
+    prose = 'Doing {this}: {"kind": "memory_write", "target": "k"}'
+    assert parse_action(prose).kind is ActionKind.MEMORY_WRITE
+    # A truncated reply is not an object, and the complete object nested
+    # inside it (a fragment of it) is not the reply either.
+    from bench.llm import first_json_object
+    assert first_json_object('{"a": {"b": 1}, "c": [') is None
+    assert first_json_object('Result {see below}: {"a": {"b": 1}}') == {"a": {"b": 1}}

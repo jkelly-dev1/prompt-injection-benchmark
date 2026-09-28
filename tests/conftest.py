@@ -7,9 +7,9 @@ noticing that a sweep of 2,028 trials just went to a paid API. So the provider
 environment is cleared for every test regardless of what the ambient shell says,
 and a test that wants a credentialed provider constructs Settings explicitly.
 
-There is no recorded-fixture or replay layer here on purpose. The offline agent
-is a synthesizing mock that is deterministic by construction (see bench/llm.py),
-so there is nothing to record and nothing to go stale.
+There is no recorded-fixture or replay layer here. The offline agent is a
+synthesizing mock that is deterministic by construction (see bench/llm.py), so
+there is nothing to record and nothing to go stale.
 """
 
 from __future__ import annotations

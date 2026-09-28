@@ -9,7 +9,7 @@ Why the tests here are shaped the way they are. Earlier in this repository a set
 of scoring tests asserted on hand-written strings with local predicates, passed
 completely, and did not notice when the predicate they described was reverted in
 the code. So the tests below drive run_trial and assert on what the PROVIDER was
-actually handed. A multi-turn path that quietly degraded to a single call would
+actually handed. A multi-turn path that silently degraded to a single call would
 still satisfy any assertion written about payload data alone.
 """
 
@@ -100,7 +100,7 @@ def test_the_exploit_turn_sees_no_directive_in_its_own_material():
 
     It is not enough that the corpus data is clean. What reaches the provider on
     the exploit turn is a RENDERED prompt, and if the harness were to fold the
-    plant into it the class would quietly become single-turn.
+    plant into it the class would silently become single-turn.
 
     Mutation check, executed in-test: the plant turn's rendered content IS
     asserted to carry a directive, so a reader that found nothing anywhere
@@ -234,14 +234,12 @@ class _EmitsTheTell:
 def test_the_output_guard_rules_on_the_turn_it_is_given_not_the_turn_before():
     """A guard cannot catch a banner that was not in the material it can see.
 
-    The bug this pins. Run_trial used to hand screen_action the PLANT turn's
-    material on every payload, so on a multi-turn trial the output guard ruled
-    on the exploit turn's reply while holding text from the turn before it. It
-    then "contained" a banner that, at the moment it ruled, appeared nowhere in
-    front of it. No such guard could be built, and crediting one exempted the
-    output family from the finding this whole class exists to produce: a control
-    that inspects only the current turn is blind to an instruction that arrived
-    earlier. Found on 2026-07-30 by re-scoring a paid sweep, not by this suite.
+    run_trial hands screen_action the material of the turn being judged. On a
+    multi-turn trial the exploit turn's material is clean, so an output guard
+    that inspects only the current turn cannot contain a banner that the plant
+    turn asked for, and must not be credited with doing so: a control that
+    inspects only the current turn is blind to an instruction that arrived
+    earlier, which is the finding this class exists to produce.
 
     Mutation check, executed in-test: the SAME provider and the SAME guard are
     run against a single-turn payload whose tell IS in the material in front of

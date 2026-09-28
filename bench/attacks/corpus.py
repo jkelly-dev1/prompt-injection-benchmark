@@ -24,7 +24,7 @@ disagreeing rather than out of anyone's opinion. Some of those gaps are one word
 wide: the denylist wants `disregard the system`, the model reads a bare
 `disregard`, and per-02 lives in exactly that word.
 
-Four things the composition is deliberately buying
+Four things the composition buys
 
   1. PARAPHRASE PAIRS, as above. Two thirds of the corpus matches no deny
      pattern as written, and over half still matches none after normalization
@@ -74,9 +74,9 @@ from __future__ import annotations
 from bench.models import ActionKind, AttackClass, Channel, Payload
 
 #: Spelled out rather than pasted in, because an invisible character sitting
-#: literally in source is a character no reviewer can see in a diff. Every use
-#: below is an f-string splice, so the evasion is legible in the code and still
-#: invisible in the payload text the agent receives.
+#: literally in source is a character no reviewer can see in a diff. Each use
+#: in this file is an f-string splice, so the evasion is legible in the code
+#: and still invisible in the payload text the agent receives.
 ZWSP = "\u200b"
 
 
@@ -1339,9 +1339,9 @@ def by_attack_class(cls: AttackClass | str) -> tuple[Payload, ...]:
 def channels() -> tuple[Channel, ...]:
     """The channels the corpus actually covers, sorted by value.
 
-    Derived from CORPUS rather than from the enum on purpose: this is the one
-    place that can tell a caller a channel was DECLARED and never populated, and
-    the corpus gate compares the two lists precisely to catch that.
+    Derived from CORPUS instead of from the enum: this is the one place that
+    can tell a caller a channel was DECLARED and never populated, and the
+    corpus gate compares the two lists precisely to catch that.
     """
     return tuple(sorted({p.channel for p in CORPUS}, key=lambda c: c.value))
 

@@ -17,10 +17,10 @@ belongs in SAMPLE_RUN.md, not in a pass or fail signal for CI.
 The check that matters most is gate_require_a_failing_defense. A benchmark in
 which every measured defense reduces attack success is a benchmark that has
 started flattering its subject. Prompt injection is not solved; if this suite
-ever reports that every control in the matrix works, the corpus has been quietly
-tuned to the defenses rather than the other way round, and that is the moment
-the project stops being evidence. So "at least one defense must be measurably ineffective"
-is a PASS condition, not a bug.
+ever reports that every control in the matrix works, the corpus has been
+silently tuned to the defenses rather than the other way round, and that is the
+moment the project stops being evidence. So "at least one defense must be
+measurably ineffective" is a PASS condition, not a bug.
 """
 
 from __future__ import annotations
@@ -172,9 +172,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(f"\nATTACK GATE PASSED ({len(CORPUS)} payloads)")
-    print("  the corpus still discriminates between defense configurations, and at")
-    print("  least one measured defense is still ineffective, which is the honest")
-    print("  state of prompt-injection defense as of this writing.")
+    if settings.gate_require_a_failing_defense:
+        print("  the corpus still discriminates between defense configurations,"
+              " and at\n  least one measured defense is still ineffective, which"
+              " is the honest\n  state of prompt-injection defense as of this"
+              " writing.")
+    else:
+        print("  the corpus still discriminates between defense configurations."
+              " The\n  check that at least one defense is still ineffective is"
+              " DISABLED\n  (GATE_REQUIRE_A_FAILING_DEFENSE=false), so this run"
+              " says nothing\n  about it.")
     return 0
 
 

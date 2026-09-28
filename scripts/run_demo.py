@@ -1,4 +1,4 @@
-"""The end to end demo: the whole matrix, then what it means.
+"""The full demo: the whole matrix, then what it means.
 
     python scripts/run_demo.py
 
@@ -341,20 +341,39 @@ def main(argv: list[str] | None = None) -> int:
     row("chain intact", "yes" if audit.verify_chain() else "NO")
 
     rule("Summary")
-    print("  prompt injection is not solved, and this benchmark is built to keep")
-    print("  saying so. The honest reading of the table above:")
-    print("")
-    print("   - the prompt-level family is too unstable to demonstrate an effect")
-    print("     at this sample size. Its measured improvement is real-looking and")
-    print("     sits inside its own flip rate.")
-    print("   - the structural controls are the ones with a demonstrated effect,")
-    print("     and they work by making compliance not matter rather than by")
-    print("     preventing it.")
-    print("   - no configuration reaches zero. The full stack still leaves attack")
-    print("     success well above zero, and that number is the point.")
+    for line in summary_lines(reports, effect_over_baseline(
+            reports, floor, per_config)):
+        print(line)
     print("")
     print("  the gate did not run here. python -m bench.attacks.gate")
     return 0
+
+
+def summary_lines(reports, effects) -> list[str]:
+    """The closing summary, read off this run's tables.
+
+    Each line states what the tables above show for the run just printed:
+    which prompt-level and which action-level configurations cleared their
+    noise floor, and which configurations reached zero attack success.
+    """
+    def family(members):
+        return [(label, shown) for label, _, shown, _ in effects
+                if set(label.split("+")) <= members]
+
+    lines = ["  prompt injection is not solved, and this benchmark is built to",
+             "  keep saying so. What the tables above show for this run:", ""]
+    for name, members in (("prompt-level", PROMPT_LEVEL),
+                          ("action-level", ACTION_LEVEL)):
+        rows = family(members)
+        cleared = [label for label, shown in rows if shown]
+        lines.append(f"   - {name} configurations clearing their noise floor: "
+                     f"{len(cleared)} of {len(rows)}")
+        lines.extend(f"       {label}" for label in cleared)
+    zero = sorted(report.label for defenses, report in reports.items()
+                  if defenses and report.attack_success.value == 0)
+    lines.append(f"   - configurations at zero attack success: {len(zero)}")
+    lines.extend(f"       {label}" for label in zero)
+    return lines
 
 
 if __name__ == "__main__":

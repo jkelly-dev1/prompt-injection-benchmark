@@ -46,7 +46,7 @@ def _shape(payloads, configs, repeats):
 class _DiesAfter:
     """A provider factory that raises once it has served N trials.
 
-    This is the crash. Using a real exception mid-matrix rather than truncating
+    This is the crash. Using a real exception mid-matrix instead of truncating
     a file afterwards means the test exercises the actual failure path: trials
     already recorded are on disk, the in-memory list is gone.
     """

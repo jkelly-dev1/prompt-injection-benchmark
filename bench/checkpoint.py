@@ -18,11 +18,11 @@ as the scoring layer will read it. Append-only, flushed per line, because a
 checkpoint that buffers is a checkpoint that loses the tail on the crash it
 exists for.
 
-The header is a guard, not a comment. Resuming one sweep into a differently
-shaped one would silently mix observations from two experiments and report the
-blend as a single measurement, which is a worse outcome than losing the run.
-So the header records the fingerprint of the sweep that produced the file, and
-a resume whose shape does not match is REFUSED with the difference named. The
+The header is a guard. Resuming one sweep into a differently shaped one would
+silently mix observations from two experiments and report the blend as a
+single measurement, which is a worse outcome than losing the run. So the
+header records the fingerprint of the sweep that produced the file, and a
+resume whose shape does not match is REFUSED with the difference named. The
 provider and model are part of that fingerprint: attempts from the mock and
 attempts from a real model are not interchangeable observations, and half a
 file of each would be an unreadable number that looks like a clean one.
@@ -49,7 +49,7 @@ def trial_key(attempt: Attempt) -> TrialKey:
 class ShapeMismatch(RuntimeError):
     """A resume was asked to continue a sweep it does not match.
 
-    Deliberately not a warning. The failure this prevents is silent: the run
+    An error and not a warning. The failure this prevents is silent: the run
     completes, the report prints, and the numbers are a blend of two different
     experiments with nothing in the output saying so.
     """
@@ -166,8 +166,8 @@ class Checkpoint:
     def record(self, attempt: Attempt) -> None:
         """Append one completed trial and flush it.
 
-        Flushed and fsync-free by design: the operating system buffer is enough
-        to survive the process dying, which is the failure this is for. A power
+        Flushed and fsync-free: the operating system buffer is enough to
+        survive the process dying, which is the failure this is for. A power
         loss mid-sweep loses the tail, and losing the tail is what the whole
         file is here to make cheap.
         """
@@ -200,7 +200,7 @@ class Checkpoint:
 
         Later lines win over earlier ones for the same key, so a trial that was
         recorded twice across two resumes resolves to the most recent
-        observation rather than raising.
+        observation instead of raising.
         """
         if not self.path.exists():
             return {}

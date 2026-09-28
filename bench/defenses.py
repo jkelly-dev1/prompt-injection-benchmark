@@ -48,7 +48,7 @@ notice before trusting the numbers underneath it)
                  that request no capability and match no deny pattern, which
                  every other family is structurally unable to touch: the agent
                  is fooled, nothing is neutralized, and there is no action to
-                 refuse. Its coverage is narrow on purpose and its number on
+                 refuse. Its coverage is narrow by choice and its number on
                  this corpus flatters it, for the reason given on the function.
 
 The action-level family is the least-privilege-agent thesis, and this repository
@@ -232,7 +232,7 @@ def unicode_normalization(request: Request) -> Request:
             decoded = base64.b64decode(padded, validate=True).decode("utf-8")
         except (binascii.Error, UnicodeDecodeError, ValueError):
             return blob
-        # REPLACE the blob rather than annotating it. Returning f"{blob}
+        # REPLACE the blob instead of annotating it. Returning f"{blob}
         # [decoded: {decoded}]", on the reasoning that keeping the original
         # preserves the record of what arrived, silently breaks the defense:
         # input_pattern_filter redacts the decoded copy, the original base64
@@ -258,6 +258,27 @@ def unicode_normalization(request: Request) -> Request:
 # --------------------------------------------------------------------------- #
 
 
+def target_host(text: str) -> str:
+    """The host out of a target, with any scheme removed.
+
+    The egress filter and the compliance judge both read hosts through this,
+    so a GET the judge scores as aimed at a host is the GET the filter rules
+    on for that same host.
+    """
+    cleaned = re.sub(r"^[a-z][a-z0-9+.-]*://", "", text.strip().lower())
+    return cleaned.split("/")[0]
+
+
+def tool_name(text: str) -> str:
+    """A tool target with any argument suffix removed.
+
+    Splits on the two shapes a model actually emits when it inlines arguments
+    into a tool name: `export_records?scope=all` and `export_records(scope=all)`.
+    Both were observed; neither is a different tool from `export_records`.
+    """
+    return re.split(r"[?(]", text.strip().lower(), maxsplit=1)[0].strip()
+
+
 def tool_allowlist(action: Action) -> str:
     """Refuse any tool call outside the grant. Returns a reason, or "".
 
@@ -267,7 +288,7 @@ def tool_allowlist(action: Action) -> str:
     """
     if action.kind is not ActionKind.TOOL_CALL:
         return ""
-    if action.target in ALLOWED_TOOLS:
+    if tool_name(action.target) in ALLOWED_TOOLS:
         return ""
     return f"tool {action.target!r} is not in the grant {ALLOWED_TOOLS}"
 
@@ -276,7 +297,7 @@ def egress_filter(action: Action) -> str:
     """Refuse outbound requests to hosts outside the allowlist."""
     if action.kind is not ActionKind.HTTP_GET:
         return ""
-    host = action.target.split("/")[0].lower()
+    host = target_host(action.target)
     if host in ALLOWED_HOSTS:
         return ""
     return f"host {host!r} is not in the egress allowlist {ALLOWED_HOSTS}"

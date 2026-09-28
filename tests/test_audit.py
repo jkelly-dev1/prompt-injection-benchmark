@@ -1,6 +1,6 @@
 """The append only hash chained log, and what it can still be trusted to prove.
 
-An audit log's only value is that it cannot be quietly revised after the fact,
+An audit log's only value is that it cannot be silently revised after the fact,
 so the property asserted here is not that records are written but that editing,
 reordering or excising one is detectable. `prev_hash` sits inside each record's
 hashed payload, which is what turns the file into a chain rather than a list of
@@ -103,7 +103,7 @@ def test_reordering_two_records_is_detected(tmp_path):
 
     Reordering leaves both records byte identical, so only the link check can
     catch it. That check works because `prev_hash` is hashed: a record carries
-    its position, it does not merely sit in one.
+    its position, it does not just sit in one.
     """
     log = AuditLog(tmp_path / "audit.jsonl")
     _three_chained_records(log)
@@ -209,7 +209,7 @@ def test_a_torn_line_is_reported_not_raised_and_the_log_keeps_working(
     """A process killed mid-write leaves half a record. The log survives it.
 
     Three good records, then a torn tail with no newline. The verifier answers
-    False rather than raising, because a report prints "chain intact yes/no"
+    False instead of raising, because a report prints "chain intact yes/no"
     and a traceback is neither. The readers skip the torn line. And the next
     append still works, chaining from the last intact record, so one lost
     record does not turn into a file that can never be written to again.
@@ -246,3 +246,27 @@ def test_a_torn_line_is_reported_not_raised_and_the_log_keeps_working(
     assert "run-0000000" in log.path.read_text(encoding="utf-8"), (
         "the torn line is kept, not silently repaired"
     )
+
+
+# The excision test above relinks without rehashing. These two pin what the
+# chain does NOT stop, so the README cannot claim it does.
+
+
+def test_a_rewrite_that_rehashes_after_an_excision_verifies_clean(tmp_path):
+    """The chain is unkeyed. Excise a record and recompute every later hash,
+    and verify_chain accepts the result: this is the documented limit."""
+    log = AuditLog(tmp_path / "rewritten.audit.jsonl")
+    _three_chained_records(log)
+    rows = [json.loads(line) for line in _lines(log)]
+    survivor = dict(rows[2], prev_hash=rows[0]["record_hash"])
+    survivor["record_hash"] = compute_record_hash(survivor)
+    _rewrite(log, [rows[0], survivor])
+    assert log.verify_chain() is True
+
+
+def test_removing_the_last_record_verifies_clean(tmp_path):
+    log = AuditLog(tmp_path / "truncated.audit.jsonl")
+    _three_chained_records(log)
+    rows = [json.loads(line) for line in _lines(log)]
+    _rewrite(log, rows[:-1])
+    assert log.verify_chain() is True

@@ -45,15 +45,24 @@ jobs:
       # than a product: it exits 1 when the corpus has stopped being able to
       # tell defense configurations apart, or when every defense suddenly looks
       # effective. A coverage matrix degrades silently, so a payload edit that
-      # quietly makes the suite unable to rank anything cannot merge.
+      # silently makes the suite unable to rank anything cannot merge.
       - name: Attack gate
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python -m bench.attacks.gate
 
-      # The demo is the offline end to end path. Running it in CI keeps
-      # SAMPLE_RUN.md honest: if the demo breaks, the build breaks.
+      # The demo is the offline path through the whole matrix: if it breaks,
+      # the build breaks. The suite also compares its output with the offline
+      # capture in SAMPLE_RUN.md (tests/test_demo.py), line for line.
       - name: Demo (offline mock)
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: python scripts/run_demo.py
+
+      # The figures in README.md and SAMPLE_RUN.md: the real-model ones derived
+      # from the published rows under results/ and the re-score files beside
+      # them, the offline ones from a fresh run of the mock matrix.
+      - name: README and SAMPLE_RUN figures match the rows and the mock
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python scripts/check_readme_numbers.py

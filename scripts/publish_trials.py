@@ -3,23 +3,27 @@
 
     python scripts/publish_trials.py audit/full.jsonl results/trials.opus.jsonl
 
-WHY THIS EXISTS. Every real-model figure in README.md is derived from a
+Why this exists. Every real-model figure in README.md is derived from a
 checkpoint under audit/, and audit/ is not published. A reader therefore cannot
-recompute those figures, which is the one thing a benchmark must allow.
+recompute those figures, which a benchmark must allow.
 
-WHAT IS PUBLISHED IS EVERY FIELD THE SCORING CONSUMES: payload_id, defenses,
+What is published is every field the scoring consumes: payload_id, defenses,
 repeat, complied, contained, contained_by, neutralized_by, attack_class,
 channel, and the action's kind and target. Running summarize() and
-effect_over_baseline() over these rows reproduces the published tables exactly,
-because those functions read nothing else.
+effect_over_baseline() over these rows reproduces what each sweep PRINTED,
+because those functions read nothing else. The RE-SCORED tables in README.md
+are these rows with results/rescored.<model>.json applied; see
+scripts/rescore.py.
 
-WHAT IS NOT PUBLISHED IS THE MODEL'S PROSE -- the answer text and the stated
-reason -- which is replaced by its LENGTH. The scoring never reads either, so
-nothing measurable is lost, and the repository does not redistribute provider
-output. The lengths are kept because they carry the one property the prose was
-evidence for: whether a refusal came with words or without.
+What is not published is the model's prose: the answer text and the stated
+reason, each replaced by its LENGTH. summarize() and the effect table read
+neither, and the repository does not redistribute provider output. Judging a
+trial again does read the answer, so a re-scored verdict that depends on it
+cannot be re-checked from these rows (see scripts/rescore.py). The lengths are
+kept because they carry the one property the prose was evidence for: whether a
+refusal came with words or without.
 
-THIS IS NOT A SIZE MEASURE. Stripping the prose removes about 41 percent of the
+This is not a size measure. Stripping the prose removes about 41 percent of the
 bytes, not an order of magnitude. The reason is provenance, not size.
 """
 import json

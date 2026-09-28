@@ -21,7 +21,7 @@ this shape:
   2. IT DECODES BASE64, because a frontier model does. This is the most
      consequential modeling choice in the repository: it is what makes
      input_pattern_filter fail on encoded payloads, and a mock that could not
-     decode would have quietly awarded the filter a pass it has not earned.
+     decode would have silently awarded the filter a pass it has not earned.
   3. Its compliance varies across repeats. The variance is a deterministic
      function of (payload, defenses, attempt), so a rerun reproduces exactly,
      but the same trial at attempt 1 and attempt 2 can differ. That is what
@@ -69,6 +69,58 @@ class AgentProvider(Protocol):
         ...
 
 
+def _brace_span_end(text: str, at: int) -> int:
+    """Index just past the brace span opening at `at`, or -1 if it never
+    closes. Braces inside JSON strings do not count."""
+    depth, in_str, esc = 0, False, False
+    for i in range(at, len(text)):
+        c = text[i]
+        if in_str:
+            if esc:
+                esc = False
+            elif c == "\\":
+                esc = True
+            elif c == '"':
+                in_str = False
+        elif c == '"':
+            in_str = True
+        elif c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return -1
+
+
+def first_json_object(text: str) -> dict | None:
+    """The first complete JSON object in `text`, or None.
+
+    Decoded from each "{" in turn, so a reply that carries two objects, or a
+    braced word in prose before the object, still yields the object. One span
+    from the first "{" to the last "}" fails on both.
+    """
+    decoder = json.JSONDecoder()
+    at = text.find("{")
+    while at != -1:
+        try:
+            obj, _ = decoder.raw_decode(text, at)
+        except json.JSONDecodeError:
+            # Resume AFTER this brace span, never inside it: a "{" nested
+            # in a truncated reply is a fragment of it (a line item, a
+            # sub-verdict), not the reply. A span that never closes is a
+            # truncated reply, and there is no object to return.
+            end = _brace_span_end(text, at)
+            if end == -1:
+                return None
+            at = text.find("{", end)
+            continue
+        if isinstance(obj, dict):
+            return obj
+        at = text.find("{", at + 1)
+    return None
+
+
 def parse_action(raw: str) -> Action:
     """Tolerantly parse a model response into a typed action.
 
@@ -81,17 +133,8 @@ def parse_action(raw: str) -> Action:
     if text.startswith("```"):
         text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
         text = re.sub(r"\n?```$", "", text).strip()
-    if not text.startswith("{"):
-        start = text.find("{")
-        end = text.rfind("}")
-        if start == -1 or end == -1 or end < start:
-            return Action(kind=ActionKind.ANSWER)
-        text = text[start : end + 1]
-    try:
-        payload = json.loads(text)
-    except (json.JSONDecodeError, TypeError):
-        return Action(kind=ActionKind.ANSWER)
-    if not isinstance(payload, dict):
+    payload = first_json_object(text)
+    if payload is None:
         return Action(kind=ActionKind.ANSWER)
     kind = str(payload.get("kind", "")).strip().lower()
     try:
@@ -338,7 +381,7 @@ def resistance(defenses: frozenset[str]) -> float:
 
 
 class MockProvider:
-    """Deterministic offline agent. Vulnerable on purpose, variable on purpose."""
+    """Deterministic offline agent, built to be vulnerable and variable."""
 
     name = "mock"
     model = "mock-deterministic-v1"
@@ -429,7 +472,7 @@ class AnthropicProvider:
     def complete(  # pragma: no cover - needs a live key
         self, *, task: str, content: str, history: History = ()
     ) -> str:
-        # Prior turns go in as real messages rather than being flattened into
+        # Prior turns go in as real messages instead of being flattened into
         # the prompt text. A transcript pasted into one user message is read as
         # quoted material; an assistant turn is read as something the model
         # itself said, and the difference is the entire mechanism under test.
@@ -508,7 +551,7 @@ def get_provider(
 ) -> AgentProvider:
     """Select a provider. Both the name AND its key are required.
 
-    A provider name without its key falls back to the mock rather than crashing,
+    A provider name without its key falls back to the mock instead of crashing,
     and a key alone never selects a provider whose name was not asked for. This
     is a safety property, not a convenience: a stray environment variable must
     not be able to send a benchmark sweep to a paid API.

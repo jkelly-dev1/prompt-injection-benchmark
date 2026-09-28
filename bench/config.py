@@ -11,9 +11,9 @@ more than in most projects because temperature, top_p and top_k are REMOVED on
 claude-opus-5 and claude-sonnet-5 and return HTTP 400, so judge and agent
 variance cannot be configured away. It has to be measured.
 
-`min_effect_over_noise` is the honesty control. A defense whose block rate
-improves by less than the measured noise floor has not been shown to work, and
-the report says so rather than printing the improvement as if it were real.
+The honesty control is not a setting: `effect_over_baseline` in
+bench/scoring.py always reports a defense whose improvement does not exceed its
+measured noise floor as NOT SHOWN instead of printing it as if it were real.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-opus-5"
     # gpt-5.6-terra is the current mid-tier: $2.50/$15 per MTok and a 1.05M
     # context. Its input price matches gpt-4o's, so this is a model upgrade at
-    # no extra input cost. gpt-5 is cheaper on paper and is deliberately NOT the
+    # no extra input cost. gpt-5 is cheaper on paper and is NOT the
     # default: OpenAI's own docs mark it superseded by the GPT-5.6 line.
     openai_model: str = "gpt-5.6-terra"
     agent_model: str | None = None
@@ -81,9 +81,6 @@ class Settings(BaseSettings):
     # because resampling happens over recorded outcomes, not over model calls.
     bootstrap_resamples: int = 2000
     bootstrap_confidence: float = 0.95
-    # A defense must beat the no-defense baseline by more than the measured
-    # noise floor before the report will call the improvement real.
-    min_effect_over_noise: float = 0.0
 
     # --- Gate thresholds -----------------------------------------------------
     # The gate protects the BENCHMARK, not a product. It fails when the corpus

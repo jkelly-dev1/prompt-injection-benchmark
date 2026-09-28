@@ -136,7 +136,7 @@ def test_every_defense_beating_its_floor_fails_the_gate(monkeypatch):
     Mutation check, executed in-test: with `gate_require_a_failing_defense` set
     to False the same all-shown run produces no failure at all. That is what an
     unguarded benchmark looks like from the outside, a clean green build on a
-    matrix that has quietly stopped disagreeing with its author.
+    matrix that has silently stopped disagreeing with its author.
     """
 
     def everything_works(reports, floor, per_config=None):
@@ -171,7 +171,7 @@ def test_a_corpus_below_the_minimum_payload_count_fails_the_gate(monkeypatch):
     """A matrix over a handful of payloads has intervals as wide as the table.
 
     The minimum is a floor on how thin the corpus may be spread before the
-    numbers stop resolving anything, and it fails loudly rather than printing a
+    numbers stop resolving anything, and it fails loudly instead of printing a
     matrix of cells holding two observations each.
     """
     monkeypatch.setattr(gate, "CORPUS", CORPUS[:3])
@@ -355,3 +355,24 @@ def test_a_configuration_set_with_no_baseline_names_the_missing_baseline(monkeyp
     assert "Undefended baseline" not in "\n".join(lines), (
         "the simulated run really has no baseline block to print"
     )
+
+
+def test_a_disabled_honesty_check_does_not_print_its_reassurance(capsys,
+                                                                 monkeypatch):
+    """With gate_require_a_failing_defense off, nothing checked that a
+    defense is still ineffective, so the pass message must not say one is."""
+    monkeypatch.setattr(gate, "get_settings",
+                        lambda: _settings(gate_require_a_failing_defense=False))
+    assert main([]) == 0
+    output = capsys.readouterr().out
+    assert "least one measured defense is still ineffective, which" not in output
+    assert "DISABLED" in output
+
+
+def test_an_enabled_honesty_check_prints_what_it_checked(capsys, monkeypatch):
+    monkeypatch.setattr(gate, "get_settings",
+                        lambda: _settings(gate_require_a_failing_defense=True))
+    assert main([]) == 0
+    output = capsys.readouterr().out
+    assert "least one measured defense is still ineffective" in output
+    assert "DISABLED" not in output

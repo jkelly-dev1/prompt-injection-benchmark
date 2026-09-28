@@ -6,8 +6,9 @@ injection write-ups collapse them into a single "blocked" number, which is what
 makes those numbers unreadable.
 
   compliance   the agent read the injected instruction and acted on it. This is
-               a property of the model and of the prompt-level defenses, and it
-               is never driven to zero by anything in this repository.
+               a property of the model and of the prompt-level defenses. The
+               offline corpus never drives it to zero; against a real model some
+               configurations do, and README.md reports which.
   containment  the action the agent tried to take was refused before it had an
                effect. This is a property of the structural defenses, and for
                the attack classes they cover it is absolute.
@@ -28,7 +29,7 @@ class Channel(str, Enum):
     """How untrusted text reaches the agent.
 
     These are delivery channels, not attack types. The same payload text is
-    carried through several of them on purpose: a defense that filters document
+    carried through several of them: a defense that filters document
     text and forgets that a tool DESCRIPTION is also attacker-controlled is a
     real and common gap, and the matrix should be able to show it.
     """
@@ -43,7 +44,7 @@ class Channel(str, Enum):
 class AttackClass(str, Enum):
     """What the payload is trying to achieve.
 
-    Kept coarse on purpose. A taxonomy with forty leaf classes produces a matrix
+    Kept coarse. A taxonomy with forty leaf classes produces a matrix
     too large to read and cells with one sample in them; each class here
     carries enough payloads to support a confidence interval.
     """
@@ -124,11 +125,11 @@ class Payload(BaseModel):
     #: structural, which is what a position is.
     tell: str = ""
 
-    #: MULTI-TURN ONLY. The operator's task on the EXPLOIT turn, which is a
+    #: Multi-turn only. The operator's task on the EXPLOIT turn, which is a
     #: different, legitimate job from the one the plant arrived under. Empty on
     #: single-turn payloads, which is all of them unless this is set.
     exploit_task: str = ""
-    #: MULTI-TURN ONLY. The material on the exploit turn, and it is DELIBERATELY
+    #: Multi-turn only. The material on the exploit turn, and it is
     #: CLEAN: no injection, nothing for a scanner to find. A defense that
     #: examines the current input sees ordinary material and has no basis to
     #: object, because the instruction it would object to arrived one turn ago

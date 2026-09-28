@@ -3,10 +3,10 @@
 Every number in the report is a claim, and the claims that matter most here are
 the ones about what a number is NOT allowed to say. An interval computed from
 one observation must not look tight. A containment rate must not be diluted by
-the trials where the agent never complied. A quiet configuration's effect must
-not be rejected using a noisy configuration's variance. A defense whose
-improvement sits inside the noise must be reported as NOT SHOWN rather than as a
-small win.
+the trials where the agent never complied. A low-noise configuration's effect
+must not be rejected using a noisy configuration's variance. A defense whose
+improvement sits inside the noise must be reported as NOT SHOWN rather than as
+a small win.
 
 Those are all refusals, and a refusal is the kind of behavior that disappears in
 a refactor without breaking anything visible, so each one is asserted against a
@@ -102,7 +102,7 @@ def test_the_bootstrap_is_deterministic_and_ignores_the_global_random_state():
     only if every call site remembered to reseed it.
 
     Non-vacuity is asserted from the other side as well: a DIFFERENT seed moves
-    the interval, so the seed really is feeding the resampler rather than being
+    the interval, so the seed really is feeding the resampler instead of being
     accepted and dropped.
     """
     outcomes = [True] * 8 + [False] * 12
@@ -229,12 +229,13 @@ def test_per_config_noise_keeps_a_quiet_config_out_of_a_noisy_ones_variance():
     """The finding that motivated per-configuration floors, in one list.
 
     Those same attempts hold a deterministic configuration
-    (`input_pattern_filter`, whose three payloads never flip across repeats) and
-    a flipping one (`delimiter_fencing`, where all three payloads disagree with
-    themselves). Measured separately the first reports 0.000 and the second
-    1.000. The global floor over the same list is 0.500, so judging the quiet
-    configuration against it would reject any effect smaller than half the
-    corpus using variance the quiet configuration contributed nothing to.
+    (`input_pattern_filter`, whose three payloads never flip across repeats)
+    and a flipping one (`delimiter_fencing`, where all three payloads disagree
+    with themselves). Measured separately the first reports 0.000 and the
+    second 1.000. The global floor over the same list is 0.500, so judging the
+    low-noise configuration against it would reject any effect smaller than
+    half the corpus using variance the low-noise configuration contributed
+    nothing to.
     """
     quiet = [
         _attempt(pid, ("input_pattern_filter",), repeat, complied=True)
@@ -396,8 +397,8 @@ def test_completely_nested_failures_are_recognized_as_correlated():
     four, so the nesting is strict. Joint failure is therefore 0.200 while
     independence would predict 0.400 * 0.200 = 0.080, and the ratio is exactly
     1/fail_a = 2.500. That identity is the signature of complete nesting: the
-    second configuration never fails alone, so stacking it on the first covers
-    nothing the first did not already cover.
+    second configuration fails only where the first does, so stacking it on the
+    first covers nothing the first did not already cover.
     """
     attempts = []
     for index in range(10):
